@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GlucoSight | Diabetes Risk Intelligence</title>
+<meta name="description" content="Machine-learning powered diabetes risk assessment, population analytics and model monitoring.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<style>
+:root{
+  --bg:#F4F6FA;--surface:#fff;--border:#E4E8F0;--ink:#0B1F3A;--text:#1F2A3D;--muted:#64748B;
+  --brand:#2563EB;--brand-600:#1D4ED8;--teal:#0EA5A4;--ok:#16A34A;--warn:#D97706;--bad:#DC2626;
+  --radius:14px;--shadow:0 1px 2px rgba(16,24,40,.05),0 4px 16px rgba(16,24,40,.06);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+h1,h2,h3,h4{color:var(--ink);letter-spacing:-.01em}
+.muted{color:var(--muted)}.small{font-size:12.5px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- buttons / inputs ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:10px;border:1px solid transparent;font-weight:600;font-size:14px;transition:all .15s;white-space:nowrap}
+.btn.primary{background:var(--brand);color:#fff;box-shadow:0 1px 2px rgba(37,99,235,.4)}
+.btn.primary:hover:not(:disabled){background:var(--brand-600);transform:translateY(-1px);box-shadow:0 6px 14px rgba(37,99,235,.28)}
+.btn.ghost{background:#fff;border-color:var(--border);color:var(--ink)}
+.btn.ghost:hover:not(:disabled){background:#F8FAFC;border-color:#CBD5E1}
+.btn.lg{padding:13px 20px;font-size:15px}.btn.sm{padding:6px 12px;font-size:12.5px}.btn.block{width:100%}
+.btn:disabled{opacity:.65;cursor:not-allowed}
+.spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;display:inline-block}
+.btn.ghost .spin{border-color:rgba(37,99,235,.25);border-top-color:var(--brand)}
+@keyframes rot{to{transform:rotate(360deg)}}
+.input,select.input{width:100%;padding:11px 13px;border:1px solid #D5DBE6;border-radius:10px;font-size:14px;background:#fff;color:var(--text);transition:border-color .15s,box-shadow .15s;font-family:inherit}
+.input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.14)}
+.field{display:flex;flex-direction:column;gap:7px}
+.field>label,.field-top label{font-weight:600;font-size:13px;color:var(--ink)}
+.field-top{display:flex;justify-content:space-between;align-items:baseline}
+.field-top .val{font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums}
+.field-sub{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:6px;background:linear-gradient(to right,var(--brand) var(--p,50%),#E2E8F0 var(--p,50%));outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--brand);box-shadow:0 1px 4px rgba(16,24,40,.25);transition:transform .15s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid var(--brand)}
+.seg{display:inline-flex;background:#EEF2F7;border-radius:10px;padding:3px;gap:2px}
+.seg.block{display:flex}.seg.block button{flex:1}
+.seg button{border:0;background:transparent;padding:6px 14px;border-radius:8px;font-weight:600;color:var(--muted);font-size:13px;transition:all .15s}
+.seg button[aria-pressed="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.14)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.chip.ok{background:#DCFCE7;color:#166534}.chip.warn{background:#FEF3C7;color:#92400E}.chip.bad{background:#FEE2E2;color:#991B1B}.chip.info{background:#DBEAFE;color:#1E40AF}.chip.neutral{background:#EEF2F7;color:#475569}
+
+/* ---------- status pill ---------- */
+.status-pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:600;background:#F1F5F9;color:#475569;border:1px solid var(--border)}
+.status-pill .dot{width:8px;height:8px;border-radius:50%;background:#94A3B8}
+.status-pill[data-state=ready]{background:#F0FDF4;color:#166534;border-color:#BBF7D0}.status-pill[data-state=ready] .dot{background:var(--ok);box-shadow:0 0 0 3px rgba(22,163,74,.18)}
+.status-pill[data-state=connecting]{background:#FFFBEB;color:#92400E;border-color:#FDE68A}.status-pill[data-state=connecting] .dot{background:var(--warn);animation:pulse 1.2s infinite}
+.status-pill[data-state=offline]{background:#FEF2F2;color:#991B1B;border-color:#FECACA}.status-pill[data-state=offline] .dot{background:var(--bad)}
+@keyframes pulse{50%{opacity:.35}}
+
+/* ---------- login ---------- */
+.login{min-height:100vh;display:grid;grid-template-columns:1.1fr 1fr;background:#fff}
+.login-hero{position:relative;overflow:hidden;color:#fff;padding:56px;display:flex;flex-direction:column;justify-content:space-between;background:radial-gradient(900px 520px at 12% 0%,rgba(37,99,235,.75),transparent 62%),radial-gradient(700px 500px at 100% 100%,rgba(14,165,164,.35),transparent 60%),linear-gradient(160deg,#0B1F3A,#0F2A4F 60%,#0B1F3A)}
+.login-hero::after{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:44px 44px;-webkit-mask-image:radial-gradient(circle at 30% 30%,#000,transparent 72%);mask-image:radial-gradient(circle at 30% 30%,#000,transparent 72%)}
+.login-hero>*{position:relative;z-index:1}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-mark{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,#2563EB,#0EA5A4);color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.4)}
+.brand-name{font-size:19px;font-weight:700;letter-spacing:-.02em}
+.pill-tag{display:inline-block;padding:5px 12px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:20px}
+.hero-copy h1{color:#fff;font-size:42px;line-height:1.12;font-weight:750;max-width:560px;margin-bottom:18px}
+.hero-copy p{color:#B7C4D9;font-size:16px;max-width:520px;margin-bottom:30px}
+.hero-points{list-style:none;display:grid;gap:14px}
+.hero-points li{display:flex;gap:14px;align-items:flex-start;color:#DCE5F2}
+.hero-points .ic{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.1);display:grid;place-items:center;flex:none;color:#7DD3FC}
+.hero-points b{display:block;color:#fff;font-weight:600}
+.hero-foot{color:#8FA3C0;font-size:12.5px}
+.login-panel{display:grid;place-items:center;padding:32px}
+.login-card{width:100%;max-width:410px}
+.login-card h2{font-size:28px;margin-bottom:6px}
+.login-card form{display:grid;gap:18px;margin-top:22px}
+.login-card .status-pill{margin-top:18px}
+.form-error{padding:10px 13px;border-radius:10px;background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;font-size:13px}
+.hint{font-size:12.5px;color:var(--muted);min-height:18px}
+.demo-box{margin-top:22px;padding:14px 16px;border:1px dashed #CBD5E1;border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:var(--muted);background:#FAFBFD}
+.demo-box b{color:var(--ink)}
+.mobile-only{display:none}
+@media(max-width:900px){.login{grid-template-columns:1fr}.login-hero{display:none}.mobile-only{display:flex;margin-bottom:28px}.mobile-only .brand-name{color:var(--ink)}}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.sidebar{background:var(--ink);color:#B7C4D9;display:flex;flex-direction:column;padding:22px 14px;position:sticky;top:0;height:100vh;z-index:40}
+.sidebar .brand{padding:0 8px 24px}.sidebar .brand-name{color:#fff}
+.nav-label{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#6F819E;padding:0 12px 8px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;border:0;background:none;width:100%;text-align:left;font-size:14px;font-weight:500;color:#AEB9CB;transition:all .15s;margin-bottom:2px}
+.nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav-item.active{background:rgba(37,99,235,.28);color:#fff;box-shadow:inset 3px 0 0 #60A5FA}
+.sidebar-foot{margin-top:auto;padding:14px 12px;border-top:1px solid rgba(255,255,255,.08);font-size:11.5px;color:#7E90AB;line-height:1.5}
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:16px;padding:14px 28px;background:rgba(255,255,255,.86);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.topbar h1{font-size:19px}.topbar .sub{font-size:12.5px;color:var(--muted)}
+.topbar .spacer{flex:1}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0EA5A4);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;text-transform:uppercase}
+.user-chip{display:flex;align-items:center;gap:10px}
+.user-chip .nm{font-weight:600;color:var(--ink);font-size:13px;line-height:1.2}.user-chip .rl{font-size:11.5px;color:var(--muted)}
+.menu-btn{display:none;border:1px solid var(--border);background:#fff;border-radius:10px;padding:8px;color:var(--ink)}
+.scrim{display:none}
+.content{padding:28px;width:100%;max-width:1380px;margin:0 auto}
+.page{display:none}.page.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(max-width:1000px){
+  .shell{grid-template-columns:1fr}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:260px;transform:translateX(-100%);transition:transform .25s}
+  .sidebar.open{transform:none}
+  .scrim.show{display:block;position:fixed;inset:0;background:rgba(11,31,58,.45);z-index:35}
+  .menu-btn{display:inline-flex}.content{padding:18px}.topbar{padding:12px 18px}.user-chip .meta{display:none}
+}
+
+/* ---------- cards / layout ---------- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-h{padding:18px 20px 0}.card-h h3{font-size:15.5px}.card-h p{font-size:12.5px;color:var(--muted);margin-top:2px}
+.card-b{padding:18px 20px 20px}
+.stack{display:grid;gap:20px}
+.predict-grid{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:24px;align-items:start}
+.sticky{position:sticky;top:84px;max-height:calc(100vh - 104px);overflow:auto}
+@media(max-width:1150px){.predict-grid{grid-template-columns:1fr}.sticky{position:static;max-height:none}}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px 22px}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#FBFCFE}
+.tr-l{font-weight:600;color:var(--ink);font-size:13px}.tr-h{font-size:11.5px;color:var(--muted)}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.btn-row{display:flex;gap:10px;margin-top:14px}.btn-row .btn{flex:1}
+.divider{height:1px;background:var(--border)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.kpi{padding:16px 18px}.kpi .l{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi .v{font-size:28px;font-weight:750;color:var(--ink);letter-spacing:-.02em;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--muted);margin-top:2px}
+.bar{height:6px;border-radius:6px;background:#EEF2F7;overflow:hidden;margin-top:10px}.bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--brand),var(--teal));transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px}
+@media(max-width:520px){.two{grid-template-columns:1fr}}
+.chart-box{position:relative;height:290px}
+.page-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:12px;background:#EFF6FF;border:1px solid #BFDBFE;color:#1E3A8A;font-size:13px}
+.callout.warn{background:#FFFBEB;border-color:#FDE68A;color:#78350F}.callout.bad{background:#FEF2F2;border-color:#FECACA;color:#7F1D1D}.callout.ok{background:#F0FDF4;border-color:#BBF7D0;color:#14532D}
+.callout svg{flex:none;margin-top:2px}
+.empty{text-align:center;padding:36px 18px;color:var(--muted)}
+.empty .ring{width:58px;height:58px;border-radius:50%;background:#EEF2FF;color:var(--brand);display:grid;place-items:center;margin:0 auto 14px}
+.empty h4{margin-bottom:4px}
+.skeleton{border-radius:10px;background:linear-gradient(90deg,#EEF2F7 25%,#F8FAFC 37%,#EEF2F7 63%);background-size:400% 100%;animation:shimmer 1.4s infinite}
+@keyframes shimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
+/* ---------- gauge & result ---------- */
+.gauge{width:100%;max-width:300px;display:block;margin:4px auto 0}
+.g-num{font-size:34px;font-weight:750;fill:var(--ink)}.g-lab{font-size:9.5px;fill:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.result-head{text-align:center}.result-head .chip{margin-top:6px;font-size:13px;padding:5px 14px}
+.driver{display:grid;grid-template-columns:150px 1fr 42px;gap:10px;align-items:center;font-size:12.5px;margin:7px 0}
+.driver .t{height:7px;background:#EEF2F7;border-radius:7px;overflow:hidden}.driver .t i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--teal));border-radius:7px}
+.driver .n{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.cmp-row{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)}
+.cmp-row:last-child{border-bottom:0}
+
+/* ---------- tables ---------- */
+.table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px;max-height:380px}
+table.dt{border-collapse:collapse;width:100%;font-size:12.5px;white-space:nowrap}
+table.dt th{position:sticky;top:0;background:#F8FAFC;color:#475569;font-weight:700;text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);font-size:11.5px;text-transform:uppercase;letter-spacing:.03em}
+table.dt td{padding:8px 12px;border-bottom:1px solid #F1F5F9;font-variant-numeric:tabular-nums}
+table.dt tr:hover td{background:#FAFCFF}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+
+/* ---------- confusion matrix ---------- */
+.cm{display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;align-items:stretch;font-size:12.5px}
+.cm .h{display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-weight:600;padding:6px}
+.cm .cell{border-radius:12px;padding:18px 10px;text-align:center;border:1px solid var(--border)}
+.cm .cell b{display:block;font-size:24px;color:var(--ink);font-variant-numeric:tabular-nums}
+.cm .cell span{color:#475569;font-size:12px}.cm .cell em{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ---------- toasts ---------- */
+#toasts{position:fixed;right:20px;bottom:20px;display:grid;gap:10px;z-index:100}
+.toast{padding:12px 16px;border-radius:12px;background:var(--ink);color:#fff;box-shadow:0 10px 30px rgba(11,31,58,.35);font-size:13.5px;max-width:360px;animation:fade .25s ease;transition:opacity .35s}
+.toast.error{background:#991B1B}.toast.success{background:#166534}.toast.out{opacity:0}
+.disclaimer{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:14px}
+</style>
+</head>
+<body>
+
+<!-- ======================= LOGIN ======================= -->
+<div class="login" id="loginView">
+  <section class="login-hero">
+    <div class="brand"><span class="brand-mark" data-icon="logo" data-size="22"></span><span class="brand-name">GlucoSight</span></div>
+    <div class="hero-copy">
+      <span class="pill-tag">Risk Intelligence Platform</span>
+      <h1>Diabetes risk insight, in seconds.</h1>
+      <p>Evaluate individual profiles with an ensemble of machine-learning models, explore the reference population, and audit model quality in one secure workspace.</p>
+      <ul class="hero-points">
+        <li><span class="ic" data-icon="layers"></span><div><b>Three validated models</b>Logistic Regression, Decision Tree and XGBoost, side by side.</div></li>
+        <li><span class="ic" data-icon="data"></span><div><b>Interactive population analytics</b>Slice 70,000+ survey records with instant visual summaries.</div></li>
+        <li><span class="ic" data-icon="shield"></span><div><b>Transparent performance</b>Precision, recall and confusion matrices for every model.</div></li>
+      </ul>
+    </div>
+    <div class="hero-foot">Decision-support tool for informational use. Not a medical diagnosis.</div>
+  </section>
+
+  <main class="login-panel">
+    <div class="login-card">
+      <div class="brand mobile-only"><span class="brand-mark" data-icon="logo" data-size="22"></span><span class="brand-name">GlucoSight</span></div>
+      <h2>Welcome back</h2>
+      <p class="muted">Sign in to access your workspace.</p>
+      <div class="status-pill" data-status data-state="connecting"><span class="dot"></span><span class="txt">Starting server…</span></div>
+      <form id="loginForm" novalidate>
+        <div class="field"><label for="username">Username</label><input class="input" id="username" autocomplete="username" autofocus></div>
+        <div class="field"><label for="password">Password</label><input class="input" type="password" id="password" autocomplete="current-password"></div>
+        <div class="form-error" id="loginError" role="alert" hidden></div>
+        <button class="btn primary lg block" id="loginBtn" type="submit">Sign in</button>
+        <p class="hint" id="loginHint"></p>
+      </form>
+      <div class="demo-box"><div>Demo workspace<br><b>demo</b> / <b>demo123</b></div><button type="button" class="btn ghost sm" id="fillDemo">Autofill</button></div>
+    </div>
+  </main>
+</div>
+
+<!-- ======================= APP ======================= -->
+<div class="shell" id="appView" hidden>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><span class="brand-mark" data-icon="logo" data-size="22"></span><span class="brand-name">GlucoSight</span></div>
+    <div class="nav-label">Workspace</div>
+    <button class="nav-item active" data-page="predict"><span data-icon="predict"></span>Risk Assessment</button>
+    <button class="nav-item" data-page="explore"><span data-icon="data"></span>Data Explorer</button>
+    <button class="nav-item" data-page="evaluate"><span data-icon="chart"></span>Model Performance</button>
+    <button class="nav-item" data-page="anomaly"><span data-icon="target"></span>Anomaly Detection</button>
+    <div class="sidebar-foot">For decision-support and educational use. Scores are model estimates, not a clinical diagnosis.</div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Open navigation" data-icon="menu"></button>
+      <div><h1 id="pageTitle">Risk Assessment</h1><div class="sub" id="pageSub"></div></div>
+      <div class="spacer"></div>
+      <div class="status-pill" data-status data-state="ready"><span class="dot"></span><span class="txt">API online</span></div>
+      <div class="user-chip"><div class="avatar" id="avatar">D</div><div class="meta"><div class="nm" id="userName">demo</div><div class="rl">Analyst</div></div></div>
+      <button class="btn ghost sm" id="logoutBtn"><span data-icon="logout" data-size="15"></span>Sign out</button>
+    </header>
+
+    <div class="content">
+      <!-- ========== PREDICT ========== -->
+      <section class="page active" id="page-predict">
+        <div class="predict-grid">
+          <div class="stack" id="formGroups"></div>
+          <aside class="card sticky">
+            <div class="card-b">
+              <div class="eyebrow">Model</div>
+              <div class="seg block" id="modelSeg">
+                <button type="button" data-m="lr" aria-pressed="true">Logistic</button>
+                <button type="button" data-m="dt" aria-pressed="false">Tree</button>
+                <button type="button" data-m="xgb" aria-pressed="false">XGBoost</button>
+              </div>
+              <p class="muted small" id="modelDesc" style="margin-top:8px"></p>
+              <div class="btn-row">
+                <button class="btn primary" id="btnPredict">Assess risk</button>
+                <button class="btn ghost" id="btnCompare">Compare all</button>
+              </div>
+              <button class="btn ghost sm block" id="btnReset" style="margin-top:10px">Reset inputs</button>
+            </div>
+            <div class="divider"></div>
+            <div class="card-b" id="resultBody"></div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ========== EXPLORE ========== -->
+      <section class="page" id="page-explore">
+        <div class="stack">
+          <div class="card">
+            <div class="card-h"><h3>Filters</h3><p>Leave a filter on “Any” to include everyone. Only filters you change are applied.</p></div>
+            <div class="card-b">
+              <div class="fgrid" id="exploreFilters"></div>
+              <div class="page-actions" style="margin-top:18px">
+                <button class="btn primary" id="exploreBtn">Apply filters</button>
+                <button class="btn ghost" id="exploreReset">Reset</button>
+                <span class="muted small" id="filterCount"></span>
+              </div>
+            </div>
+          </div>
+          <div id="exploreResults"></div>
+        </div>
+      </section>
+
+      <!-- ========== EVALUATE ========== -->
+      <section class="page" id="page-evaluate">
+        <div class="stack">
+          <div class="page-actions">
+            <div class="seg" id="evalSeg">
+              <button type="button" data-m="lr" aria-pressed="true">Logistic Regression</button>
+              <button type="button" data-m="dt" aria-pressed="false">Decision Tree</button>
+              <button type="button" data-m="xgb" aria-pressed="false">XGBoost</button>
+            </div>
+          </div>
+          <div id="evaluationResults"></div>
+        </div>
+      </section>
+
+      <!-- ========== ANOMALY ========== -->
+      <section class="page" id="page-anomaly">
+        <div class="stack">
+          <div class="card">
+            <div class="card-h"><h3>Analysis settings</h3><p>Unsupervised detection of unusual profiles, visualised on the first two principal components.</p></div>
+            <div class="card-b">
+              <div class="fgrid">
+                <div class="field"><label>Algorithm</label>
+                  <div class="seg block" id="anomSeg">
+                    <button type="button" data-m="if" aria-pressed="true">Isolation Forest</button>
+                    <button type="button" data-m="svm" aria-pressed="false">One-Class SVM</button>
+                  </div>
+                </div>
+                <div class="field"><div class="field-top"><label for="contam">Expected anomaly rate</label><span class="val" id="contamVal">5%</span></div>
+                  <input type="range" id="contam" min="1" max="15" step="1" value="5">
+                  <div class="field-sub"><span>1%</span><span>15%</span></div>
+                </div>
+                <label class="toggle-row" style="cursor:pointer"><div><div class="tr-l">Score my current profile</div><div class="tr-h">Uses the values from Risk Assessment</div></div><input type="checkbox" id="useProfile" checked style="width:18px;height:18px"></label>
+              </div>
+              <div class="page-actions" style="margin-top:18px"><button class="btn primary" id="anomalyBtn">Run analysis</button></div>
+            </div>
+          </div>
+          <div id="anomalyResults"><div class="card"><div class="empty"><div class="ring" data-icon="target" data-size="26"></div><h4>No analysis yet</h4><p>Choose an algorithm and run the analysis to see outliers in the population.</p></div></div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+<div id="toasts"></div>
+
+<script>
+'use strict';
+/* ====================================================================
+   CONFIG  - the only line you normally need to change
+==================================================================== */
+const API_BASE_URL = 'https://diabetes-predictor-backend-tpi6.onrender.com/api';
+
+/* ====================================================================
+   Helpers
+==================================================================== */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Number(n).toLocaleString('en-US');
+const pct = (x, d = 1) => (x * 100).toFixed(d) + '%';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const ICONS = {
+  logo:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>',
+  predict:'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  data:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>',
+  chart:'<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  target:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  menu:'<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+  shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+  layers:'<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  alert:'<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  info:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+  check:'<polyline points="20 6 9 17 4 12"/>'
+};
+const icon = (n, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+function hydrateIcons(root = document) { $$('[data-icon]', root).forEach(el => { el.innerHTML = icon(el.dataset.icon, Number(el.dataset.size) || 18); }); }
+
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type; el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(() => el.classList.add('out'), 4200);
+  setTimeout(() => el.remove(), 4700);
+}
+function setLoading(btn, on, label) {
+  if (on) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span>${label || 'Working…'}`; }
+  else { btn.disabled = false; if (btn.dataset.label) { btn.innerHTML = btn.dataset.label; delete btn.dataset.label; } }
+}
+const skeleton = (h = 120) => `<div class="skeleton" style="height:${h}px"></div>`;
+
+/* ====================================================================
+   API layer: timeouts, retries (for cold starts), session handling
+==================================================================== */
+class ApiError extends Error { constructor(m, status) { super(m); this.status = status; } }
+let authToken = null, currentUser = null;
+
+async function fetchT(url, opts, timeout) {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), timeout);
+  try { return await fetch(url, { ...opts, signal: ctl.signal }); } finally { clearTimeout(t); }
+}
+async function api(path, { method = 'GET', body, timeout = 60000, retries = 0, auth = true } = {}) {
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  if (auth && authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  let attempt = 0;
+  for (;;) {
+    try {
+      const res = await fetchT(API_BASE_URL + path, { method, headers, body: body ? JSON.stringify(body) : undefined }, timeout);
+      let data = null; try { data = await res.json(); } catch (_) {}
+      if (res.status === 401 && auth) { signOut('Your session has expired. Please sign in again.'); throw new ApiError('Session expired', 401); }
+      if ([502, 503, 504].includes(res.status) && attempt < retries) { attempt++; await sleep(1500 * attempt); continue; }
+      if (!res.ok || (data && data.success === false)) throw new ApiError((data && (data.message || data.error)) || `Request failed (${res.status})`, res.status);
+      return data;
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      if (attempt < retries) { attempt++; await sleep(1500 * attempt); continue; }
+      throw new ApiError(err.name === 'AbortError'
+        ? 'The request timed out. The server may still be starting, please try again.'
+        : 'Unable to reach the server. Check your connection and try again.', 0);
+    }
+  }
+}
+
+/* ---- backend wake-up: starts the moment the page loads ---- */
+let readyPromise = null;
+function setStatus(state, text) { $$('[data-status]').forEach(el => { el.dataset.state = state; $('.txt', el).textContent = text; }); }
+const setHint = t => { $('#loginHint').textContent = t; };
+function warmBackend() {
+  if (readyPromise) return readyPromise;
+  const start = Date.now();
+  setStatus('connecting', 'Starting server…');
+  readyPromise = (async () => {
+    while (Date.now() - start < 150000) {
+      try {
+        const res = await fetchT(API_BASE_URL + '/health', {}, 10000);
+        if (res.ok) { setStatus('ready', 'API online'); setHint(''); return true; }
+      } catch (_) {}
+      const s = Math.round((Date.now() - start) / 1000);
+      setStatus('connecting', `Starting server… ${s}s`);
+      if (s > 5) setHint('The server was idle and is waking up. This usually takes under a minute. You can sign in now and we will continue automatically.');
+      await sleep(2000);
+    }
+    setStatus('offline', 'API unreachable'); readyPromise = null; return false;
+  })();
+  return readyPromise;
+}
+let pingTimer = null;
+async function ping() {
+  try { const r = await fetchT(API_BASE_URL + '/health', {}, 10000); setStatus(r.ok ? 'ready' : 'connecting', r.ok ? 'API online' : 'Server busy…'); }
+  catch (_) { setStatus('offline', 'API unreachable'); }
+}
+
+/* ====================================================================
+   Auth / navigation
+==================================================================== */
+function showLoginError(m) { const el = $('#loginError'); el.textContent = m; el.hidden = !m; }
+$('#fillDemo').addEventListener('click', () => { $('#username').value = 'demo'; $('#password').value = 'demo123'; showLoginError(''); });
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const u = $('#username').value.trim(), p = $('#password').value, btn = $('#loginBtn');
+  if (!u || !p) { showLoginError('Enter your username and password.'); return; }
+  showLoginError(''); setLoading(btn, true, 'Signing in…');
+  try {
+    const ok = await warmBackend();
+    if (!ok) throw new ApiError('The server is unreachable right now. Please try again shortly.', 0);
+    const res = await api('/login', { method: 'POST', body: { username: u, password: p }, auth: false, timeout: 30000, retries: 2 });
+    authToken = res.token; currentUser = u; enterApp();
+  } catch (err) {
+    showLoginError(err.status === 401 ? 'Incorrect username or password.' : err.message);
+  } finally { setLoading(btn, false); }
+});
+
+function enterApp() {
+  $('#loginView').hidden = true; $('#appView').hidden = false; $('#password').value = '';
+  $('#userName').textContent = currentUser; $('#avatar').textContent = currentUser.slice(0, 1);
+  renderForm(); buildExploreFilters(); setModel('lr'); showPage('predict');
+  clearTimeout(pingTimer); pingTimer = setInterval(ping, 240000);
+}
+function signOut(msg) {
+  if (authToken) api('/logout', { method: 'POST', body: {}, timeout: 8000 }).catch(() => {});
+  authToken = null; currentUser = null; clearInterval(pingTimer);
+  Object.keys(evalCache).forEach(k => delete evalCache[k]); exploreLoaded = false; evalLoadedOnce = false;
+  Object.values(charts).forEach(c => c.destroy()); Object.keys(charts).forEach(k => delete charts[k]);
+  $('#appView').hidden = true; $('#loginView').hidden = false; $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('show');
+  if (msg) toast(msg, 'info');
+}
+$('#logoutBtn').addEventListener('click', () => signOut('You have been signed out.'));
+
+const PAGES = {
+  predict:  ['Risk Assessment', 'Score an individual profile with a selected model'],
+  explore:  ['Data Explorer', 'Filter and profile the reference population'],
+  evaluate: ['Model Performance', 'Held-out test-set metrics for each model'],
+  anomaly:  ['Anomaly Detection', 'Unsupervised outlier analysis on a PCA projection']
+};
+function showPage(name) {
+  $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === name));
+  $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+  $('#pageTitle').textContent = PAGES[name][0]; $('#pageSub').textContent = PAGES[name][1];
+  $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('show');
+  window.scrollTo({ top: 0 });
+  if (name === 'explore' && !exploreLoaded) exploreData();
+  if (name === 'evaluate' && !evalLoadedOnce) { evalLoadedOnce = true; loadEval(evalModel); }
+}
+$$('.nav-item').forEach(b => b.addEventListener('click', () => showPage(b.dataset.page)));
+$('#menuBtn').addEventListener('click', () => { $('#sidebar').classList.add('open'); $('#scrim').classList.add('show'); });
+$('#scrim').addEventListener('click', () => { $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('show'); });
+
+/* ====================================================================
+   Shared: labels, charts, tables
+==================================================================== */
+const MODELS = {
+  lr:  { name: 'Logistic Regression', desc: 'Interpretable linear baseline. Returns a probability.' },
+  dt:  { name: 'Decision Tree', desc: 'Rule-based classifier. Returns a class label only (no probability).' },
+  xgb: { name: 'XGBoost', desc: 'Gradient-boosted ensemble. Typically the strongest performer.' }
+};
+const FEATURE_LABELS = {
+  HighBP:'High blood pressure', HighChol:'High cholesterol', CholCheck:'Cholesterol check', BMI:'BMI', Smoker:'Smoker', Stroke:'Stroke history',
+  HeartDiseaseorAttack:'Heart disease / attack', PhysActivity:'Physical activity', Fruits:'Eats fruit', Veggies:'Eats vegetables',
+  HvyAlcoholConsump:'Heavy alcohol use', AnyHealthcare:'Has coverage', NoDocbcCost:'Skipped doctor (cost)', GenHlth:'General health',
+  MentHlth:'Poor mental-health days', PhysHlth:'Poor physical-health days', DiffWalk:'Difficulty walking', Sex:'Sex', Age:'Age',
+  Education:'Education', MidpointSalary:'Income', UnderWeight:'BMI: underweight', NormalWeight:'BMI: normal', OverWeight:'BMI: overweight', Obese:'BMI: obese'
+};
+const label = k => FEATURE_LABELS[k] || k;
+const bmiCat = b => b < 18.5 ? 'Underweight' : b < 25 ? 'Normal weight' : b < 30 ? 'Overweight' : 'Obese';
+const bmiTone = c => ({ 'Underweight':'info', 'Normal weight':'ok', 'Overweight':'warn', 'Obese':'bad' }[c]);
+
+const charts = {};
+function mountChart(id, cfg) {
+  if (typeof Chart === 'undefined') return;
+  const el = document.getElementById(id); if (!el) return;
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(el, cfg);
+}
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.font.family = '-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif';
+  Chart.defaults.color = '#64748B';
+}
+function chartOpts(o = {}) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    animation: o.animation === undefined ? { duration: 350 } : o.animation,
+    indexAxis: o.indexAxis || 'x',
+    plugins: { legend: { display: !!o.legend, position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+               tooltip: { backgroundColor: '#0B1F3A', padding: 10, cornerRadius: 8 } },
+    scales: o.scales || { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#EEF2F7' } } }
+  };
+}
+function tableHTML(rows) {
+  if (!rows || !rows.length) return '<div class="empty muted">No records to display.</div>';
+  const heads = Object.keys(rows[0]);
+  const cell = v => typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(2)) : esc(v);
+  return `<div class="table-wrap"><table class="dt"><thead><tr>${heads.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${
+    rows.map(r => `<tr>${heads.map(h => `<td>${cell(r[h])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+const kpi = (l, v, s = '', extra = '') => `<div class="card kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div>${extra}</div>`;
+const errorCard = (msg, retryId) => `<div class="card"><div class="card-b"><div class="callout bad">${icon('alert')}<div><b>Something went wrong.</b> ${esc(msg)}<div style="margin-top:10px"><button class="btn ghost sm" id="${retryId}">Try again</button></div></div></div></div></div>`;
+
+/* ====================================================================
+   PREDICT
+==================================================================== */
+const GEN_LABELS = ['', 'Excellent', 'Very good', 'Good', 'Fair', 'Poor'];
+const bin = (id, label, hint, def = 0) => ({ id, label, hint, type: 'bin', def });
+const GROUPS = [
+  { title: 'Demographics', desc: 'Basic profile information', fields: [
+    { id:'Age', label:'Age', type:'range', min:18, max:85, step:1, def:50, unit:'yrs' },
+    { id:'Sex', label:'Sex', type:'seg', options:[[0,'Female'],[1,'Male']], def:0 },
+    { id:'Education', label:'Education', type:'range', min:0, max:16, step:1, def:12, unit:'yrs' },
+    { id:'MidpointSalary', label:'Annual income', type:'range', min:5000, max:87500, step:2500, def:40000, fmt: v => '$' + Number(v).toLocaleString('en-US') }
+  ]},
+  { title: 'Body metrics', desc: 'Body-mass index drives the weight category', fields: [
+    { id:'BMI', label:'Body-mass index (BMI)', type:'range', min:10, max:60, step:0.1, def:25 }
+  ]},
+  { title: 'Clinical history', desc: 'Diagnosed conditions and screening', fields: [
+    bin('HighBP', 'High blood pressure', 'Diagnosed by a clinician'),
+    bin('HighChol', 'High cholesterol', 'Diagnosed by a clinician'),
+    bin('CholCheck', 'Cholesterol check', 'Checked within the last 5 years', 1),
+    bin('Stroke', 'History of stroke'),
+    bin('HeartDiseaseorAttack', 'Heart disease or attack', 'Coronary disease or MI')
+  ]},
+  { title: 'Lifestyle', desc: 'Habits and behaviours', fields: [
+    bin('Smoker', 'Smoker', '100+ cigarettes in lifetime'),
+    bin('PhysActivity', 'Physical activity', 'Exercise in the past 30 days', 1),
+    bin('Fruits', 'Eats fruit daily', '', 1),
+    bin('Veggies', 'Eats vegetables daily', '', 1),
+    bin('HvyAlcoholConsump', 'Heavy alcohol use')
+  ]},
+  { title: 'Self-reported health', desc: 'How the person rates their own health', fields: [
+    { id:'GenHlth', label:'General health', type:'range', min:1, max:5, step:1, def:3, minLabel:'Excellent', maxLabel:'Poor' },
+    { id:'PhysHlth', label:'Poor physical-health days (30d)', type:'range', min:0, max:30, step:1, def:0, unit:'days' },
+    { id:'MentHlth', label:'Poor mental-health days (30d)', type:'range', min:0, max:30, step:1, def:0, unit:'days' },
+    bin('DiffWalk', 'Difficulty walking', 'Walking or climbing stairs')
+  ]},
+  { title: 'Access to care', desc: 'Coverage and affordability', fields: [
+    bin('AnyHealthcare', 'Has health coverage', '', 1),
+    bin('NoDocbcCost', 'Skipped doctor due to cost', 'Needed care but could not afford it')
+  ]}
+];
+const state = {}; GROUPS.forEach(g => g.fields.forEach(f => { state[f.id] = f.def; }));
+const getInput = () => Object.fromEntries(Object.entries(state).map(([k, v]) => [k, Number(v)]));
+
+function displayVal(f, v) {
+  if (f.id === 'GenHlth') return `${v} · ${GEN_LABELS[v]}`;
+  if (f.id === 'BMI') return Number(v).toFixed(1);
+  if (f.fmt) return f.fmt(v);
+  return f.unit ? `${v} ${f.unit}` : String(v);
+}
+function fieldHTML(f) {
+  if (f.type === 'range') {
+    return `<div class="field"><div class="field-top"><label for="f_${f.id}">${f.label}</label><span class="val" id="v_${f.id}">${displayVal(f, state[f.id])}</span></div>
+      <input type="range" id="f_${f.id}" data-id="${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${state[f.id]}">
+      <div class="field-sub"><span>${f.minLabel || (f.fmt ? f.fmt(f.min) : f.min)}</span><span>${f.maxLabel || (f.fmt ? f.fmt(f.max) : f.max)}</span></div>
+      ${f.id === 'BMI' ? '<div id="bmiBadge"></div>' : ''}</div>`;
+  }
+  const opts = f.type === 'bin' ? [[0, 'No'], [1, 'Yes']] : f.options;
+  return `<div class="toggle-row"><div><div class="tr-l">${f.label}</div>${f.hint ? `<div class="tr-h">${f.hint}</div>` : ''}</div>
+    <div class="seg" role="group" aria-label="${f.label}">${opts.map(([v, l]) => `<button type="button" data-id="${f.id}" data-v="${v}" aria-pressed="${state[f.id] == v}">${l}</button>`).join('')}</div></div>`;
+}
+function setFill(inp) { inp.style.setProperty('--p', ((inp.value - inp.min) / (inp.max - inp.min) * 100) + '%'); }
+function updateBmiBadge() {
+  const el = $('#bmiBadge'); if (!el) return;
+  const c = bmiCat(Number(state.BMI)); el.innerHTML = `<span class="chip ${bmiTone(c)}">${c}</span>`;
+}
+function renderForm() {
+  $('#formGroups').innerHTML = GROUPS.map(g => `<section class="card"><div class="card-h"><h3>${g.title}</h3><p>${g.desc}</p></div><div class="card-b fgrid">${g.fields.map(fieldHTML).join('')}</div></section>`).join('');
+  $$('#formGroups input[type=range]').forEach(setFill); updateBmiBadge();
+  $('#resultBody').innerHTML = emptyResult();
+}
+$('#formGroups').addEventListener('input', e => {
+  const t = e.target; if (t.type !== 'range') return;
+  const id = t.dataset.id, f = GROUPS.flatMap(g => g.fields).find(x => x.id === id);
+  state[id] = Number(t.value); $('#v_' + id).textContent = displayVal(f, t.value); setFill(t); if (id === 'BMI') updateBmiBadge();
+});
+$('#formGroups').addEventListener('click', e => {
+  const b = e.target.closest('button[data-id]'); if (!b) return;
+  state[b.dataset.id] = Number(b.dataset.v);
+  $$(`button[data-id="${b.dataset.id}"]`, b.parentElement).forEach(x => x.setAttribute('aria-pressed', x === b));
+});
+
+let selectedModel = 'lr';
+function setModel(m) {
+  selectedModel = m;
+  $$('#modelSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === m));
+  $('#modelDesc').textContent = MODELS[m].desc;
+}
+$('#modelSeg').addEventListener('click', e => { const b = e.target.closest('button[data-m]'); if (b) setModel(b.dataset.m); });
+$('#btnReset').addEventListener('click', () => { GROUPS.forEach(g => g.fields.forEach(f => { state[f.id] = f.def; })); renderForm(); });
+
+const emptyResult = () => `<div class="empty"><div class="ring" data-icon="predict" data-size="26"></div><h4>Ready to assess</h4><p class="small">Adjust the profile on the left, choose a model, then select <b>Assess risk</b>.</p></div>`;
+const DISCLAIMER = '<p class="disclaimer">Model scores are statistical estimates learned from survey data and are not a diagnosis. Risk bands are illustrative. Consult a qualified clinician for medical decisions.</p>';
+
+async function predictWith(m) {
+  return api('/predict', { method: 'POST', body: { model_type: m, input_data: getInput() }, timeout: 60000, retries: 2 });
+}
+function tierOf(p, cls) {
+  if (p === null || p === undefined) return cls === 1 ? 'high' : 'low';
+  return p >= 0.65 ? 'high' : p >= 0.35 ? 'moderate' : 'low';
+}
+const TIERS = { low: ['Low risk', 'var(--ok)', 'ok'], moderate: ['Moderate risk', 'var(--warn)', 'warn'], high: ['High risk', 'var(--bad)', 'bad'] };
+
+function renderResult(res, m) {
+  const p = res.prediction_proba, cls = res.prediction_class, tier = tierOf(p, cls), [tl, tc, tcls] = TIERS[tier];
+  const hasP = p !== null && p !== undefined;
+  const maxImp = Math.max(...(res.feature_importance || []).map(x => x[1]), 1e-9);
+  const drivers = (res.feature_importance || []).slice(0, 8).map(([k, v]) =>
+    `<div class="driver"><span>${esc(label(k))}</span><span class="t"><i style="width:${(v / maxImp * 100).toFixed(0)}%"></i></span><span class="n">${(v / maxImp * 100).toFixed(0)}</span></div>`).join('');
+  const gauge = hasP ? `<svg class="gauge" viewBox="0 0 200 118" role="img" aria-label="Risk score ${(p * 100).toFixed(0)} percent">
+      <path d="M 12 100 A 88 88 0 0 1 188 100" fill="none" stroke="#E8EDF5" stroke-width="14" stroke-linecap="round" pathLength="100"/>
+      <path id="gArc" d="M 12 100 A 88 88 0 0 1 188 100" fill="none" stroke="${tc}" stroke-width="14" stroke-linecap="round" pathLength="100" style="stroke-dasharray:0 100;transition:stroke-dasharray .9s cubic-bezier(.2,.8,.2,1)"/>
+      <text x="100" y="84" text-anchor="middle" class="g-num">${(p * 100).toFixed(0)}%</text>
+      <text x="100" y="108" text-anchor="middle" class="g-lab">Model risk score</text></svg>`
+    : `<div class="empty" style="padding:18px 0 4px"><div class="ring" style="background:${cls ? '#FEE2E2' : '#DCFCE7'};color:${tc}" data-icon="${cls ? 'alert' : 'check'}" data-size="26"></div><p class="small">This model returns a class label only, without a probability.</p></div>`;
+  $('#resultBody').innerHTML = `<div class="result-head">${gauge}<span class="chip ${tcls}">${tl}</span>
+      <p class="muted small" style="margin-top:8px">${MODELS[m].name} classifies this profile as <b>${cls === 1 ? 'positive' : 'negative'}</b> for diabetes.</p>
+      <p style="margin-top:10px"><span class="chip ${bmiTone(res.bmi_category)}">BMI: ${esc(res.bmi_category)}</span></p></div>
+    ${drivers ? `<div style="margin-top:20px"><div class="eyebrow">Top model drivers</div>${drivers}<p class="muted small" style="margin-top:6px">Global feature importance from the XGBoost model (0-100). It shows what the model relies on overall, not a personalised explanation.</p></div>` : ''}${DISCLAIMER}`;
+  hydrateIcons($('#resultBody'));
+  if (hasP) requestAnimationFrame(() => requestAnimationFrame(() => { const a = $('#gArc'); if (a) a.style.strokeDasharray = `${(p * 100).toFixed(1)} 100`; }));
+}
+function resultError(msg) { $('#resultBody').innerHTML = `<div class="callout bad">${icon('alert')}<div>${esc(msg)}</div></div>`; }
+function resultLoading() { $('#resultBody').innerHTML = `<div style="display:grid;gap:12px">${skeleton(130)}${skeleton(18)}${skeleton(90)}</div>`; }
+
+$('#btnPredict').addEventListener('click', async () => {
+  const btn = $('#btnPredict'); setLoading(btn, true, 'Assessing…'); resultLoading();
+  try { renderResult(await predictWith(selectedModel), selectedModel); }
+  catch (err) { if (err.status !== 401) resultError(err.message); }
+  finally { setLoading(btn, false); }
+});
+$('#btnCompare').addEventListener('click', async () => {
+  const btn = $('#btnCompare'); setLoading(btn, true, 'Comparing…'); resultLoading();
+  try {
+    const keys = Object.keys(MODELS);
+    const out = await Promise.allSettled(keys.map(predictWith));
+    const ok = out.filter(o => o.status === 'fulfilled');
+    if (!ok.length) throw new Error(out[0].reason ? out[0].reason.message : 'Comparison failed.');
+    const flagged = ok.filter(o => o.value.prediction_class === 1).length;
+    const rows = keys.map((k, i) => {
+      const o = out[i]; if (o.status !== 'fulfilled') return `<div class="cmp-row"><b>${MODELS[k].name}</b><span class="chip neutral">Unavailable</span></div>`;
+      const r = o.value, p = r.prediction_proba, [tl, tc, tcls] = TIERS[tierOf(p, r.prediction_class)];
+      return `<div class="cmp-row"><b>${MODELS[k].name}</b><div><span class="chip ${tcls}">${r.prediction_class === 1 ? 'Positive' : 'Negative'}</span> ${p != null ? `<span class="muted small" style="margin-left:6px">${(p * 100).toFixed(1)}%</span>` : ''}
+        ${p != null ? `<div class="bar"><i style="width:${(p * 100).toFixed(0)}%;background:${tc}"></i></div>` : ''}</div></div>`;
+    }).join('');
+    const tone = flagged === 0 ? 'ok' : flagged === ok.length ? 'bad' : 'warn';
+    $('#resultBody').innerHTML = `<div class="callout ${tone}">${icon('info')}<div><b>${flagged} of ${ok.length} models</b> classify this profile as positive.</div></div>
+      <div style="margin-top:14px">${rows}</div>${DISCLAIMER}`;
+  } catch (err) { if (err.status !== 401) resultError(err.message); }
+  finally { setLoading(btn, false); }
+});
+
+/* ====================================================================
+   EXPLORE
+==================================================================== */
+let exploreLoaded = false, datasetTotal = null;
+const BIN_FILTERS = [['HighBP','High blood pressure'],['HighChol','High cholesterol'],['Smoker','Smoker'],['Fruits','Eats fruit'],['Veggies','Eats vegetables'],['PhysActivity','Physical activity'],['HvyAlcoholConsump','Heavy alcohol'],['DiffWalk','Difficulty walking'],['AnyHealthcare','Has coverage'],['HeartDiseaseorAttack','Heart disease'],['Stroke','Stroke']];
+const RANGE_FILTERS = [['BMI','BMI','10','60'],['Age','Age','18','85'],['GenHlth','General health (1-5)','1','5']];
+function buildExploreFilters() {
+  const sel = (k, l, opts) => `<div class="field"><label for="flt_${k}">${l}</label><select class="input" id="flt_${k}" data-k="${k}">${opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></div>`;
+  const yn = [['', 'Any'], ['1', 'Yes'], ['0', 'No']];
+  $('#exploreFilters').innerHTML =
+    sel('Sex', 'Sex', [['', 'Any'], ['0', 'Female'], ['1', 'Male']]) +
+    BIN_FILTERS.map(([k, l]) => sel(k, l, yn)).join('') +
+    RANGE_FILTERS.map(([k, l, a, b]) => `<div class="field"><label>${l}</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <input class="input" type="number" inputmode="numeric" placeholder="Min ${a}" data-k="${k}_min"><input class="input" type="number" inputmode="numeric" placeholder="Max ${b}" data-k="${k}_max"></div></div>`).join('');
+}
+function collectFilters() {
+  const f = {};
+  $$('#exploreFilters select').forEach(s => { if (s.value !== '') f[s.dataset.k] = s.value; });
+  $$('#exploreFilters input[type=number]').forEach(i => { if (i.value !== '') f[i.dataset.k] = i.value; });
+  return f;
+}
+$('#exploreFilters').addEventListener('change', () => { const n = Object.keys(collectFilters()).length; $('#filterCount').textContent = n ? `${n} filter${n > 1 ? 's' : ''} selected` : ''; });
+$('#exploreBtn').addEventListener('click', exploreData);
+$('#exploreReset').addEventListener('click', () => { buildExploreFilters(); $('#filterCount').textContent = ''; exploreData(); });
+
+async function exploreData() {
+  const btn = $('#exploreBtn'); setLoading(btn, true, 'Loading…');
+  $('#exploreResults').innerHTML = `<div class="kpis">${[1,2,3].map(() => skeleton(92)).join('')}</div><div style="margin-top:20px">${skeleton(300)}</div>`;
+  try {
+    const r = await api('/explore', { method: 'POST', body: { filters: collectFilters() }, timeout: 90000, retries: 2 });
+    if (datasetTotal === null && !Object.keys(collectFilters()).length) datasetTotal = r.data.total_records;
+    exploreLoaded = true; renderExplore(r.data);
+  } catch (err) {
+    if (err.status !== 401) { $('#exploreResults').innerHTML = errorCard(err.message, 'retryExplore'); $('#retryExplore').addEventListener('click', exploreData); }
+  } finally { setLoading(btn, false); }
+}
+function parseSexCounts(obj) {
+  const out = {};
+  Object.entries(obj || {}).forEach(([k, v]) => { const m = k.match(/'([^']+)'\s*,\s*'([^']+)'/); if (m) { out[m[1]] = out[m[1]] || {}; out[m[1]][m[2]] = v; } });
+  return out;
+}
+function renderExplore(d) {
+  const total = d.total_records, sc = parseSexCounts(d.diabetes_by_sex);
+  const diab = Object.values(sc['Diabetes'] || {}).reduce((a, b) => a + b, 0);
+  if (!total) { $('#exploreResults').innerHTML = `<div class="card"><div class="empty"><div class="ring" data-icon="data" data-size="26"></div><h4>No records match</h4><p>Try widening or resetting your filters.</p></div></div>`; hydrateIcons($('#exploreResults')); return; }
+  const share = datasetTotal ? total / datasetTotal : null;
+  $('#exploreResults').innerHTML = `<div class="stack">
+    <div class="kpis">
+      ${kpi('Matching records', fmt(total), share !== null ? `${pct(share)} of ${fmt(datasetTotal)} total` : '', share !== null ? `<div class="bar"><i style="width:${(share * 100).toFixed(1)}%"></i></div>` : '')}
+      ${kpi('Diabetes prevalence', pct(diab / total), `${fmt(diab)} positive cases in selection`)}
+      ${kpi('Sex split (F / M)', `${fmt(((sc['Diabetes']||{}).Female || 0) + ((sc['No Diabetes']||{}).Female || 0))} / ${fmt(((sc['Diabetes']||{}).Male || 0) + ((sc['No Diabetes']||{}).Male || 0))}`, 'Female / Male records')}
+    </div>
+    <div class="two">
+      <div class="card"><div class="card-h"><h3>Diabetes by sex</h3></div><div class="card-b"><div class="chart-box"><canvas id="chSex"></canvas></div></div></div>
+      <div class="card"><div class="card-h"><h3>BMI distribution</h3></div><div class="card-b"><div class="chart-box"><canvas id="chBmi"></canvas></div></div></div>
+      <div class="card"><div class="card-h"><h3>Age distribution</h3></div><div class="card-b"><div class="chart-box"><canvas id="chAge"></canvas></div></div></div>
+      <div class="card"><div class="card-h"><h3>Income distribution</h3></div><div class="card-b"><div class="chart-box"><canvas id="chInc"></canvas></div></div></div>
+    </div>
+    <div class="card"><div class="card-h"><h3>Sample records</h3><p>First 10 rows of the current selection</p></div><div class="card-b">${tableHTML(d.sample_data)}</div></div></div>`;
+
+  const cats = ['Female', 'Male'];
+  mountChart('chSex', { type: 'bar', data: { labels: cats, datasets: [
+    { label: 'No diabetes', data: cats.map(c => (sc['No Diabetes'] || {})[c] || 0), backgroundColor: '#60A5FA', borderRadius: 6 },
+    { label: 'Diabetes', data: cats.map(c => (sc['Diabetes'] || {})[c] || 0), backgroundColor: '#EF4444', borderRadius: 6 }] }, options: chartOpts({ legend: true }) });
+  const bk = Object.keys(d.bmi_distribution).map(Number).sort((a, b) => a - b);
+  mountChart('chBmi', { type: 'bar', data: { labels: bk.map(k => `${k}-${k + 2}`), datasets: [{ data: bk.map(k => d.bmi_distribution[String(k)]), backgroundColor: '#0EA5A4', borderRadius: 4, categoryPercentage: .95, barPercentage: 1 }] }, options: chartOpts() });
+  const ak = Object.keys(d.age_distribution).map(Number).sort((a, b) => a - b);
+  mountChart('chAge', { type: 'bar', data: { labels: ak, datasets: [{ data: ak.map(k => d.age_distribution[String(k)]), backgroundColor: '#2563EB', borderRadius: 4 }] }, options: chartOpts() });
+  const ik = Object.keys(d.salary_distribution).map(Number).sort((a, b) => a - b);
+  mountChart('chInc', { type: 'bar', data: { labels: ik.map(k => '$' + (k / 1000) + 'k'), datasets: [{ data: ik.map(k => d.salary_distribution[String(k)]), backgroundColor: '#8B5CF6', borderRadius: 4 }] }, options: chartOpts() });
+}
+
+/* ====================================================================
+   EVALUATE
+==================================================================== */
+const evalCache = {}; let evalModel = 'lr', evalLoadedOnce = false, prefetching = false;
+$('#evalSeg').addEventListener('click', e => { const b = e.target.closest('button[data-m]'); if (b) loadEval(b.dataset.m); });
+async function loadEval(m) {
+  evalModel = m; $$('#evalSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === m));
+  if (evalCache[m]) { renderEval(m); return; }
+  $('#evaluationResults').innerHTML = `<div class="kpis">${[1,2,3,4].map(() => skeleton(104)).join('')}</div><div style="margin-top:20px">${skeleton(300)}</div>`;
+  try {
+    const r = await api('/evaluate', { method: 'POST', body: { model_type: m }, timeout: 90000, retries: 2 });
+    evalCache[m] = r.metrics; if (evalModel === m) renderEval(m); prefetchEval();
+  } catch (err) {
+    if (err.status !== 401) { $('#evaluationResults').innerHTML = errorCard(err.message, 'retryEval'); $('#retryEval').addEventListener('click', () => loadEval(m)); }
+  }
+}
+async function prefetchEval() {
+  if (prefetching) return; prefetching = true;
+  for (const m of Object.keys(MODELS)) {
+    if (evalCache[m] || !authToken) continue;
+    try { const r = await api('/evaluate', { method: 'POST', body: { model_type: m }, timeout: 90000 }); evalCache[m] = r.metrics; renderModelComparison(); } catch (_) {}
+  }
+  prefetching = false;
+}
+function renderEval(m) {
+  const x = evalCache[m], cm = x.confusion_matrix, tot = cm.tn + cm.fp + cm.fn + cm.tp;
+  const spec = cm.tn / (cm.tn + cm.fp || 1), npv = cm.tn / (cm.tn + cm.fn || 1);
+  const metric = (l, v, d) => kpi(l, pct(v), d, `<div class="bar"><i style="width:${(v * 100).toFixed(1)}%"></i></div>`);
+  const cell = (n, name, good) => { const s = n / tot, a = (0.08 + s * 0.7).toFixed(2); return `<div class="cell" style="background:rgba(${good ? '37,99,235' : '239,68,68'},${a})"><b>${fmt(n)}</b><span>${name}</span><em>${pct(s)} of test set</em></div>`; };
+  $('#evaluationResults').innerHTML = `<div class="stack">
+    <div class="kpis">${metric('Accuracy', x.accuracy, 'Overall correct predictions')}${metric('Precision', x.precision, 'Positive flags that are correct')}${metric('Recall', x.recall, 'Actual cases detected')}${metric('F1 score', x.f1, 'Balance of precision and recall')}</div>
+    <div class="callout">${icon('info')}<div><b>${MODELS[m].name}:</b> ${MODELS[m].desc} It detects <b>${pct(x.recall, 0)}</b> of true diabetes cases, and <b>${pct(x.precision, 0)}</b> of its positive flags are correct. Specificity ${pct(spec, 0)}, negative predictive value ${pct(npv, 0)}.</div></div>
+    <div class="two">
+      <div class="card"><div class="card-h"><h3>Confusion matrix</h3><p>${fmt(tot)} held-out records</p></div><div class="card-b">
+        <div class="cm"><div></div><div class="h">Predicted: No diabetes</div><div class="h">Predicted: Diabetes</div>
+          <div class="h">Actual: No diabetes</div>${cell(cm.tn, 'True negative', true)}${cell(cm.fp, 'False positive', false)}
+          <div class="h">Actual: Diabetes</div>${cell(cm.fn, 'False negative', false)}${cell(cm.tp, 'True positive', true)}</div></div></div>
+      <div class="card"><div class="card-h"><h3>Model comparison</h3><p id="cmpNote"></p></div><div class="card-b"><div class="chart-box"><canvas id="chCmp"></canvas></div></div></div>
+    </div></div>`;
+  renderModelComparison();
+}
+function renderModelComparison() {
+  if (!$('#chCmp')) return;
+  const colors = { lr: '#2563EB', dt: '#0EA5A4', xgb: '#8B5CF6' }, done = Object.keys(evalCache);
+  $('#cmpNote').textContent = done.length < Object.keys(MODELS).length ? 'Loading remaining models…' : 'All models, same test split';
+  mountChart('chCmp', { type: 'bar', data: { labels: ['Accuracy', 'Precision', 'Recall', 'F1'], datasets: done.map(k => ({
+    label: MODELS[k].name, backgroundColor: colors[k], borderRadius: 5, data: [evalCache[k].accuracy, evalCache[k].precision, evalCache[k].recall, evalCache[k].f1] })) },
+    options: chartOpts({ legend: true, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, max: 1, grid: { color: '#EEF2F7' } } } }) });
+}
+
+/* ====================================================================
+   ANOMALY
+==================================================================== */
+let anomalyModel = 'if';
+$('#anomSeg').addEventListener('click', e => { const b = e.target.closest('button[data-m]'); if (!b) return; anomalyModel = b.dataset.m; $$('#anomSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+$('#contam').addEventListener('input', e => { $('#contamVal').textContent = e.target.value + '%'; setFill(e.target); });
+$('#anomalyBtn').addEventListener('click', runAnomaly);
+async function runAnomaly() {
+  const btn = $('#anomalyBtn'); setLoading(btn, true, 'Analysing…');
+  $('#anomalyResults').innerHTML = `<div class="kpis">${[1,2,3,4].map(() => skeleton(92)).join('')}</div><div style="margin-top:20px">${skeleton(340)}</div>`;
+  try {
+    const body = { model_type: anomalyModel, contamination: Number($('#contam').value) / 100 };
+    if ($('#useProfile').checked) body.input_data = getInput();
+    renderAnomaly(await api('/anomaly', { method: 'POST', body, timeout: 120000, retries: 1 }));
+  } catch (err) {
+    if (err.status !== 401) { $('#anomalyResults').innerHTML = errorCard(err.message, 'retryAnom'); $('#retryAnom').addEventListener('click', runAnomaly); }
+  } finally { setLoading(btn, false); }
+}
+function renderAnomaly(r) {
+  const v = r.variance_explained, rate = r.anomaly_count / r.total_count;
+  const verdict = r.user_prediction === 1 ? `<div class="callout ok">${icon('check')}<div><b>Typical profile.</b> Your current profile is consistent with most of the reference population.</div></div>`
+    : r.user_prediction === -1 ? `<div class="callout warn">${icon('alert')}<div><b>Atypical profile.</b> Your current profile differs from most of the reference population under this model. This is a statistical observation, not a clinical finding.</div></div>` : '';
+  $('#anomalyResults').innerHTML = `<div class="stack">${verdict}
+    <div class="kpis">
+      ${kpi('Anomalies flagged', fmt(r.anomaly_count), `${pct(rate)} of the analysed sample`)}
+      ${kpi('Records analysed', fmt(r.total_count), 'Random sample of the dataset')}
+      ${kpi('Variance explained', pct(v[0] + v[1]), `PC1 ${pct(v[0])} · PC2 ${pct(v[1])}`)}
+      ${kpi('Compute time', r.elapsed_ms < 1000 ? r.elapsed_ms + ' ms' : (r.elapsed_ms / 1000).toFixed(1) + ' s', r.cached ? 'Served from cache' : 'Freshly computed')}
+    </div>
+    <div class="two">
+      <div class="card"><div class="card-h"><h3>PCA projection</h3><p>Each point is a record, reduced to two dimensions</p></div><div class="card-b"><div class="chart-box" style="height:360px"><canvas id="chPca"></canvas></div></div></div>
+      <div class="card"><div class="card-h"><h3>What makes anomalies different</h3><p>Mean difference after scaling (anomaly minus typical)</p></div><div class="card-b"><div class="chart-box" style="height:360px"><canvas id="chDiff"></canvas></div></div></div>
+    </div>
+    <div class="card"><div class="card-h"><h3>Example records</h3></div><div class="card-b">
+      <div class="tabs"><div class="seg" id="anomTabs"><button type="button" data-t="n" aria-pressed="true">Typical</button><button type="button" data-t="a" aria-pressed="false">Anomalous</button></div></div>
+      <div id="tblN">${tableHTML(r.normal_sample)}</div><div id="tblA" hidden>${tableHTML(r.anomaly_sample)}</div></div></div></div>`;
+  $('#anomTabs').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; $$('#anomTabs button').forEach(x => x.setAttribute('aria-pressed', x === b)); $('#tblN').hidden = b.dataset.t !== 'n'; $('#tblA').hidden = b.dataset.t !== 'a'; });
+
+  const pts = o => o.x.map((x, i) => ({ x, y: o.y[i] }));
+  mountChart('chPca', { type: 'scatter', data: { datasets: [
+    { label: 'Typical', data: pts(r.pca_data.normal), backgroundColor: 'rgba(37,99,235,.35)', pointRadius: 2.5, borderWidth: 0 },
+    { label: 'Anomaly', data: pts(r.pca_data.anomaly), backgroundColor: '#EF4444', borderColor: '#EF4444', pointStyle: 'crossRot', pointRadius: 5, borderWidth: 1.5 }] },
+    options: { ...chartOpts({ legend: true, animation: false, scales: { x: { title: { display: true, text: `PC1 (${pct(v[0])})` }, grid: { color: '#F1F5F9' } }, y: { title: { display: true, text: `PC2 (${pct(v[1])})` }, grid: { color: '#F1F5F9' } } } }), parsing: false, normalized: true } });
+  const top = Object.entries(r.feature_differences_scaled).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 10);
+  mountChart('chDiff', { type: 'bar', data: { labels: top.map(t => label(t[0])), datasets: [{ data: top.map(t => t[1]), backgroundColor: top.map(t => t[1] > 0 ? '#EF4444' : '#16A34A'), borderRadius: 4 }] },
+    options: chartOpts({ indexAxis: 'y', scales: { x: { grid: { color: '#EEF2F7' } }, y: { grid: { display: false } } } }) });
+}
+
+/* ====================================================================
+   Boot: wake the backend immediately while the user types credentials
+==================================================================== */
+hydrateIcons();
+$('#modelDesc').textContent = MODELS.lr.desc;
+setFill($('#contam'));
+warmBackend();
+</script>
+</body>
+</html>
